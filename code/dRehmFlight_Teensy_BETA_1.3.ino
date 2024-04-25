@@ -208,9 +208,13 @@ float Kd_yaw = 0.00015;       //Yaw D-gain (be careful when increasing too high,
 //========================================================================================================================//                                          
 
 //NOTE: Pin 13 is reserved for onboard LED, pins 18 and 19 are reserved for the MPU6050 IMU for default setup
+//! need to remap SCK to 14 instead of 13, to keep both spi and builtin led working
+
 //Radio:
 //! Note: If using SBUS, connect to pin 21 (RX5), if using DSM, connect to pin 15 (RX3)
 const int ch1Pin = 15; //throttle
+
+//! only using ch1Pin, since we are using SBUS, so these pins are not used
 const int ch2Pin = 16; //ail
 const int ch3Pin = 17; //ele
 const int ch4Pin = 20; //rudd
@@ -230,13 +234,13 @@ const int servo2Pin = 7;
 const int servo3Pin = 8;
 const int servo4Pin = 9;
 
-//------------- USED UP FOR AS5047 ENCODER ----------------
+//!------------- USED UP FOR AS5047 ENCODER ----------------
 
 // const int servo5Pin = 10;
 // const int servo6Pin = 11;
 // const int servo7Pin = 12;
 
-//------------- USED UP FOR AS5047 ENCODER ----------------
+//!------------- USED UP FOR AS5047 ENCODER ----------------
 
 PWMServo servo1;  //Create servo objects to control a servo or ESC with PWM
 PWMServo servo2;
@@ -403,7 +407,7 @@ void loop() {
   //Print data at 100hz (uncomment one at a time for troubleshooting) - SELECT ONE:
   //printRadioData();     //Prints radio pwm values (expected: 1000 to 2000)
   //printDesiredState();  //Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
-  printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
+  //printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
   //printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
   //printMagData();       //Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
   //printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
