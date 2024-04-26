@@ -25,7 +25,6 @@ Everyone that sends me pictures and videos of your flying creations! -Nick
 */
 
 
-
 //========================================================================================================================//
 //                                                 USER-SPECIFIED DEFINES                                                 //                                                                 
 //========================================================================================================================//
@@ -64,6 +63,7 @@ static const uint8_t num_DSM_channels = 6; //If using DSM RX, change this to mat
 #include <Wire.h>     //I2c communication
 #include <SPI.h>      //SPI communication
 #include <PWMServo.h> //Commanding any extra actuators, installed with teensyduino installer
+#include <AS5047P.h>  //Encoder library
 
 #if defined USE_SBUS_RX
   #include "src/SBUS/SBUS.h"   //sBus interface
@@ -83,7 +83,19 @@ static const uint8_t num_DSM_channels = 6; //If using DSM RX, change this to mat
   #error No MPU defined... 
 #endif
 
+//========================================================================================================================//
 
+//Setup AS5047P encoder
+
+//GREEN - CS - 10
+//YELLOW - MOSI - 11
+//WHITE - MISO - 12
+//BLUE - SCK - 14 (remapped from default 13 to keep onboard LED working)
+
+#define AS5047P_CHIP_SELECT_PORT 10
+#define AS5047P_CUSTOM_SPI_BUS_SPEED 100000
+
+AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
 
 //========================================================================================================================//
 
@@ -279,6 +291,9 @@ unsigned long channel_1_pwm_prev, channel_2_pwm_prev, channel_3_pwm_prev, channe
   DSM1024 DSM;
 #endif
 
+//AS5047P encoder
+float motorRads;
+
 //IMU:
 float AccX, AccY, AccZ;
 float AccX_prev, AccY_prev, AccZ_prev;
@@ -331,9 +346,13 @@ void setup() {
   servo2.attach(servo2Pin, 900, 2100);
   servo3.attach(servo3Pin, 900, 2100);
   servo4.attach(servo4Pin, 900, 2100);
-  servo5.attach(servo5Pin, 900, 2100);
-  servo6.attach(servo6Pin, 900, 2100);
-  servo7.attach(servo7Pin, 900, 2100);
+  // servo5.attach(servo5Pin, 900, 2100);
+  // servo6.attach(servo6Pin, 900, 2100);
+  // servo7.attach(servo7Pin, 900, 2100);
+
+  //Remap SCK to pin 14 to keep onboard LED working
+  SPI.setSCK(14); 
+
 
   //Set built in LED to turn on to signal startup
   digitalWrite(13, HIGH);
@@ -350,6 +369,9 @@ void setup() {
   channel_4_pwm = channel_4_fs;
   channel_5_pwm = channel_5_fs;
   channel_6_pwm = channel_6_fs;
+
+  //Initialize AS5047P encoder
+  AS5047Pinit();
 
   //Initialize IMU communication
   IMUinit();
@@ -407,7 +429,8 @@ void loop() {
   //Print data at 100hz (uncomment one at a time for troubleshooting) - SELECT ONE:
   //printRadioData();     //Prints radio pwm values (expected: 1000 to 2000)
   //printDesiredState();  //Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
-  //printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
+  //printAS5047PData();       //Prints magnetic encoder data 
+  printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
   //printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
   //printMagData();       //Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
   //printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
@@ -418,6 +441,9 @@ void loop() {
 
   // Get arming status
   armedStatus(); //Check if the throttle cut is off and throttle is low.
+
+  //get motorRads
+  getMotorRads();
 
   //Get vehicle state
   getIMUdata(); //Pulls raw gyro, accelerometer, and magnetometer data from IMU and LP filters to remove noise
@@ -482,12 +508,22 @@ void controlMixer() {
    */
 
   //Quad mixing - EXAMPLE
-  m1_command_scaled = thro_des - pitch_PID + roll_PID + yaw_PID; //Front Left
-  m2_command_scaled = thro_des - pitch_PID - roll_PID - yaw_PID; //Front Right
-  m3_command_scaled = thro_des + pitch_PID - roll_PID + yaw_PID; //Back Right
-  m4_command_scaled = thro_des + pitch_PID + roll_PID - yaw_PID; //Back Left
+  // m1_command_scaled = thro_des - pitch_PID + roll_PID + yaw_PID; //Front Left
+  // m2_command_scaled = thro_des - pitch_PID - roll_PID - yaw_PID; //Front Right
+  // m3_command_scaled = thro_des + pitch_PID - roll_PID + yaw_PID; //Back Right
+  // m4_command_scaled = thro_des + pitch_PID + roll_PID - yaw_PID; //Back Left
+  // m5_command_scaled = 0;
+  // m6_command_scaled = 0;
+
+  //! first guess at how the mixer is going to work, need to change the yaw output somewhere else to make use of bidirectinal, might need to use pwm instead of oneshot125
+
+  m1_command_scaled = thro_des + (pitch_PID * cos(motorRads)) + (roll_PID *sin(motorRads));
+  m2_command_scaled = yaw_PID;
+  m3_command_scaled = 0;
+  m4_command_scaled = 0;
   m5_command_scaled = 0;
   m6_command_scaled = 0;
+
 
   //0.5 is centered servo, 0.0 is zero throttle if connecting to ESC for conventional PWM, 1.0 is max throttle
   s1_command_scaled = 0;
@@ -504,6 +540,17 @@ void armedStatus() {
   //DESCRIPTION: Check if the throttle cut is off and the throttle input is low to prepare for flight.
   if ((channel_5_pwm < 1500) && (channel_1_pwm < 1050)) {
     armedFly = true;
+  }
+}
+
+void AS5047Pinit(){
+  //DESCRIPTION: Initialize AS5047P encoder
+  
+  while (!as5047p.initSPI())
+  {
+    Serial.println(F("AS5047P initialization unsuccessful"));
+    Serial.println(F("Check AS5047P wiring or try cycling power"));
+    delay(5000);
   }
 }
 
@@ -553,6 +600,13 @@ void IMUinit() {
   #endif
 }
 
+void getMotorRads(){
+  //DESCRIPTION: Get motor radians for mixer
+
+  motorRads = (as5047p.readAngleDegree())* PI/180;
+
+}
+
 void getIMUdata() {
   //DESCRIPTION: Request full dataset from IMU and LP filter gyro, accelerometer, and magnetometer data
   /*
@@ -566,14 +620,16 @@ void getIMUdata() {
   int16_t AcX,AcY,AcZ,GyX,GyY,GyZ,MgX,MgY,MgZ;
 
   #if defined USE_MPU6050_I2C
-    mpu6050.getMotion6(&AcX, &AcY, &AcZ, &GyX, &GyY, &GyZ);
+    // mpu6050.getMotion6(&AcX, &AcY, &AcZ, &GyX, &GyY, &GyZ);
+    //! customized getMotion paramters because imu orientation is different
+    mpu6050.getMotion6(&AcX, &AcZ, &AcY, &GyX, &GyZ, &GyY);
   #elif defined USE_MPU9250_SPI
     mpu9250.getMotion9(&AcX, &AcY, &AcZ, &GyX, &GyY, &GyZ, &MgX, &MgY, &MgZ);
   #endif
 
  //Accelerometer
   AccX = AcX / ACCEL_SCALE_FACTOR; //G's
-  AccY = AcY / ACCEL_SCALE_FACTOR;
+  AccY = -AcY / ACCEL_SCALE_FACTOR; //Invert Y axis to match modified IMU orientation
   AccZ = AcZ / ACCEL_SCALE_FACTOR;
   //Correct the outputs with the calculated error values
   AccX = AccX - AccErrorX;
@@ -589,7 +645,7 @@ void getIMUdata() {
 
   //Gyro
   GyroX = GyX / GYRO_SCALE_FACTOR; //deg/sec
-  GyroY = GyY / GYRO_SCALE_FACTOR;
+  GyroY = -GyY / GYRO_SCALE_FACTOR; //Invert Y axis to match modified IMU orientation
   GyroZ = GyZ / GYRO_SCALE_FACTOR;
   //Correct the outputs with the calculated error values
   GyroX = GyroX - GyroErrorX;
@@ -1582,6 +1638,7 @@ void setupBlink(int numBlinks,int upTime, int downTime) {
 void printRadioData() {
   if (current_time - print_counter > 10000) {
     print_counter = micros();
+
     Serial.print(F(" CH1:"));
     Serial.print(channel_1_pwm);
     Serial.print(F(" CH2:"));
@@ -1600,6 +1657,7 @@ void printRadioData() {
 void printDesiredState() {
   if (current_time - print_counter > 10000) {
     print_counter = micros();
+
     Serial.print(F("thro_des:"));
     Serial.print(thro_des);
     Serial.print(F(" roll_des:"));
@@ -1611,14 +1669,37 @@ void printDesiredState() {
   }
 }
 
+void printAS5047PData(){
+  if (current_time - print_counter > 10000) {
+    print_counter = micros();
+    
+    Serial.print("Min:");
+    Serial.print(0);
+    Serial.print(",Max:");
+    Serial.print(PI*2);
+
+    Serial.print(",MotorRads:");
+    Serial.println(motorRads);
+  }
+}
+
+
+
+
 void printGyroData() {
   if (current_time - print_counter > 10000) {
     print_counter = micros();
-    Serial.print(F("GyroX:"));
+
+    Serial.print("Min:");
+    Serial.print(-250);
+    Serial.print(",Max:");
+    Serial.print(250);
+
+    Serial.print((",GyroX:"));
     Serial.print(GyroX);
-    Serial.print(F(" GyroY:"));
+    Serial.print((",GyroY:"));
     Serial.print(GyroY);
-    Serial.print(F(" GyroZ:"));
+    Serial.print((",GyroZ:"));
     Serial.println(GyroZ);
   }
 }
@@ -1626,6 +1707,7 @@ void printGyroData() {
 void printAccelData() {
   if (current_time - print_counter > 10000) {
     print_counter = micros();
+
     Serial.print(F("AccX:"));
     Serial.print(AccX);
     Serial.print(F(" AccY:"));
@@ -1638,6 +1720,7 @@ void printAccelData() {
 void printMagData() {
   if (current_time - print_counter > 10000) {
     print_counter = micros();
+
     Serial.print(F("MagX:"));
     Serial.print(MagX);
     Serial.print(F(" MagY:"));
@@ -1650,6 +1733,7 @@ void printMagData() {
 void printRollPitchYaw() {
   if (current_time - print_counter > 10000) {
     print_counter = micros();
+
     Serial.print(F("roll:"));
     Serial.print(roll_IMU);
     Serial.print(F(" pitch:"));
@@ -1662,6 +1746,7 @@ void printRollPitchYaw() {
 void printPIDoutput() {
   if (current_time - print_counter > 10000) {
     print_counter = micros();
+
     Serial.print(F("roll_PID:"));
     Serial.print(roll_PID);
     Serial.print(F(" pitch_PID:"));
@@ -1674,24 +1759,31 @@ void printPIDoutput() {
 void printMotorCommands() {
   if (current_time - print_counter > 10000) {
     print_counter = micros();
-    Serial.print(F("m1_command:"));
+
+    Serial.print("Min:");
+    Serial.print(120);
+    Serial.print(",Max:");
+    Serial.print(250);
+
+    Serial.print(F(" m1_command:"));
     Serial.print(m1_command_PWM);
     Serial.print(F(" m2_command:"));
-    Serial.print(m2_command_PWM);
-    Serial.print(F(" m3_command:"));
-    Serial.print(m3_command_PWM);
-    Serial.print(F(" m4_command:"));
-    Serial.print(m4_command_PWM);
-    Serial.print(F(" m5_command:"));
-    Serial.print(m5_command_PWM);
-    Serial.print(F(" m6_command:"));
-    Serial.println(m6_command_PWM);
+    Serial.println(m2_command_PWM);
+    // Serial.print(F(" m3_command:"));
+    // Serial.print(m3_command_PWM); 
+    // Serial.print(F(" m4_command:"));
+    // Serial.print(m4_command_PWM);
+    // Serial.print(F(" m5_command:"));
+    // Serial.print(m5_command_PWM);
+    // Serial.print(F(" m6_command:"));
+    // Serial.println(m6_command_PWM);
   }
 }
 
 void printServoCommands() {
   if (current_time - print_counter > 10000) {
     print_counter = micros();
+
     Serial.print(F("s1_command:"));
     Serial.print(s1_command_PWM);
     Serial.print(F(" s2_command:"));
@@ -1712,6 +1804,7 @@ void printServoCommands() {
 void printLoopRate() {
   if (current_time - print_counter > 10000) {
     print_counter = micros();
+
     Serial.print(F("dt:"));
     Serial.println(dt*1000000.0);
   }
