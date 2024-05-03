@@ -219,20 +219,20 @@ float Kd_yaw = 0.00015;       //Yaw D-gain (be careful when increasing too high,
 //                                                     DECLARE PINS                                                       //                           
 //========================================================================================================================//                                          
 
-//NOTE: Pin 13 is reserved for onboard LED, pins 18 and 19 are reserved for the MPU6050 IMU for default setup
-//! need to remap SCK to 14 instead of 13, to keep both spi and builtin led working
+//NOTE: Pins 18 and 19 are reserved for the MPU6050 IMU for default setup
 
 //Radio:
 //! Note: If using SBUS, connect to pin 21 (RX5), if using DSM, connect to pin 15 (RX3)
 const int ch1Pin = 15; //throttle
 
 //! only using ch1Pin, since we are using SBUS, so these pins are not used
-const int ch2Pin = 16; //ail
-const int ch3Pin = 17; //ele
-const int ch4Pin = 20; //rudd
-const int ch5Pin = 21; //gear (throttle cut)
-const int ch6Pin = 22; //aux1 (free aux channel)
-const int PPM_Pin = 23;
+// const int ch2Pin = 16; //ail
+// const int ch3Pin = 17; //ele
+// const int ch4Pin = 20; //rudd
+// const int ch5Pin = 21; //gear (throttle cut)
+// const int ch6Pin = 22; //aux1 (free aux channel)
+// const int PPM_Pin = 23;
+
 //OneShot125 ESC pin outputs:
 const int m1Pin = 0;
 const int m2Pin = 1;
@@ -252,15 +252,15 @@ const int servo4Pin = 9;
 // const int servo6Pin = 11;
 // const int servo7Pin = 12;
 
-//!------------- USED UP FOR AS5047 ENCODER ----------------
+//!---------------------------------------------------------
 
-PWMServo servo1;  //Create servo objects to control a servo or ESC with PWM
-PWMServo servo2;
-PWMServo servo3;
-PWMServo servo4;
-PWMServo servo5;
-PWMServo servo6;
-PWMServo servo7;
+// PWMServo servo1;  //Create servo objects to control a servo or ESC with PWM
+// PWMServo servo2;
+// PWMServo servo3;
+// PWMServo servo4;
+// PWMServo servo5;
+// PWMServo servo6;
+// PWMServo servo7;
 
 
 
@@ -274,8 +274,6 @@ PWMServo servo7;
 float dt;
 unsigned long current_time, prev_time;
 unsigned long print_counter, serial_counter;
-unsigned long blink_counter, blink_delay;
-bool blinkAlternate;
 
 //Radio communication:
 unsigned long channel_1_pwm, channel_2_pwm, channel_3_pwm, channel_4_pwm, channel_5_pwm, channel_6_pwm;
@@ -335,7 +333,7 @@ void setup() {
   delay(500);
   
   //Initialize all pins
-  pinMode(13, OUTPUT); //Pin 13 LED blinker on board, do not modify 
+
   pinMode(m1Pin, OUTPUT);
   pinMode(m2Pin, OUTPUT);
   pinMode(m3Pin, OUTPUT);
@@ -350,12 +348,6 @@ void setup() {
   // servo6.attach(servo6Pin, 900, 2100);
   // servo7.attach(servo7Pin, 900, 2100);
 
-  //Remap SCK to pin 14 to keep onboard LED working
-  SPI.setSCK(14); 
-
-
-  //Set built in LED to turn on to signal startup
-  digitalWrite(13, HIGH);
 
   delay(5);
 
@@ -403,9 +395,6 @@ void setup() {
   m5_command_PWM = 125;
   m6_command_PWM = 125;
   armMotors(); //Loop over commandMotors() until ESCs happily arm
-  
-  //Indicate entering main loop with 3 quick blinks
-  setupBlink(3,160,70); //numBlinks, upTime (ms), downTime (ms)
 
   //If using MPU9250 IMU, uncomment for one-time magnetometer calibration (may need to repeat for new locations)
   //calibrateMagnetometer(); //Generates magentometer error and scale factors to be pasted in user-specified variables section
@@ -417,20 +406,19 @@ void setup() {
 //========================================================================================================================//
 //                                                       MAIN LOOP                                                        //                           
 //========================================================================================================================//
-                                                  
+
 void loop() {
   //Keep track of what time it is and how much time has elapsed since the last loop
   prev_time = current_time;      
   current_time = micros();      
   dt = (current_time - prev_time)/1000000.0;
 
-  loopBlink(); //Indicate we are in main loop with short blink every 1.5 seconds
 
   //Print data at 100hz (uncomment one at a time for troubleshooting) - SELECT ONE:
   //printRadioData();     //Prints radio pwm values (expected: 1000 to 2000)
   //printDesiredState();  //Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
   //printAS5047PData();       //Prints magnetic encoder data 
-  printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
+  //printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
   //printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
   //printMagData();       //Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
   //printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
@@ -538,8 +526,9 @@ void controlMixer() {
 
 void armedStatus() {
   //DESCRIPTION: Check if the throttle cut is off and the throttle input is low to prepare for flight.
-  if ((channel_5_pwm < 1500) && (channel_1_pwm < 1050)) {
+  if ((channel_5_pwm < 1500) && (channel_1_pwm < 1050) && (channel_2_pwm > 1050)) {
     armedFly = true;
+    //Serial.println("Armed");
   }
 }
 
@@ -621,7 +610,7 @@ void getIMUdata() {
 
   #if defined USE_MPU6050_I2C
     // mpu6050.getMotion6(&AcX, &AcY, &AcZ, &GyX, &GyY, &GyZ);
-    //! customized getMotion paramters because imu orientation is different
+    //! customized getMotion parameters because imu orientation is different
     mpu6050.getMotion6(&AcX, &AcZ, &AcY, &GyX, &GyZ, &GyY);
   #elif defined USE_MPU9250_SPI
     mpu9250.getMotion9(&AcX, &AcY, &AcZ, &GyX, &GyY, &GyZ, &MgX, &MgY, &MgZ);
@@ -1404,8 +1393,6 @@ void calibrateESCs() {
       current_time = micros();      
       dt = (current_time - prev_time)/1000000.0;
     
-      digitalWrite(13, HIGH); //LED on to indicate we are not in main loop
-
       getCommands(); //Pulls current available radio commands
       failSafe(); //Prevent failures in event of bad receiver connection, defaults to failsafe values assigned in setup
       getDesState(); //Convert raw commands to normalized values based on saturated control limits
@@ -1606,34 +1593,6 @@ void loopRate(int freq) {
   }
 }
 
-void loopBlink() {
-  //DESCRIPTION: Blink LED on board to indicate main loop is running
-  /*
-   * It looks cool.
-   */
-  if (current_time - blink_counter > blink_delay) {
-    blink_counter = micros();
-    digitalWrite(13, blinkAlternate); //Pin 13 is built in LED
-    
-    if (blinkAlternate == 1) {
-      blinkAlternate = 0;
-      }
-    else if (blinkAlternate == 0) {
-      blinkAlternate = 1;
-      blink_delay = 2000000;
-      }
-  }
-}
-
-void setupBlink(int numBlinks,int upTime, int downTime) {
-  //DESCRIPTION: Simple function to make LED on board blink as desired
-  for (int j = 1; j<= numBlinks; j++) {
-    digitalWrite(13, LOW);
-    delay(downTime);
-    digitalWrite(13, HIGH);
-    delay(upTime);
-  }
-}
 
 void printRadioData() {
   if (current_time - print_counter > 10000) {
