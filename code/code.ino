@@ -226,12 +226,12 @@ float Kd_yaw = 0.00015;       //Yaw D-gain (be careful when increasing too high,
 const int ch1Pin = 15; //throttle
 
 //! only using ch1Pin, since we are using SBUS, so these pins are not used
-// const int ch2Pin = 16; //ail
-// const int ch3Pin = 17; //ele
-// const int ch4Pin = 20; //rudd
-// const int ch5Pin = 21; //gear (throttle cut)
-// const int ch6Pin = 22; //aux1 (free aux channel)
-// const int PPM_Pin = 23;
+const int ch2Pin = 16; //ail
+const int ch3Pin = 17; //ele
+const int ch4Pin = 20; //rudd
+const int ch5Pin = 21; //gear (throttle cut)
+const int ch6Pin = 22; //aux1 (free aux channel)
+const int PPM_Pin = 23;
 
 //OneShot125 ESC pin outputs:
 const int m1Pin = 0;
@@ -254,13 +254,13 @@ const int servo4Pin = 9;
 
 //!---------------------------------------------------------
 
-// PWMServo servo1;  //Create servo objects to control a servo or ESC with PWM
-// PWMServo servo2;
-// PWMServo servo3;
-// PWMServo servo4;
-// PWMServo servo5;
-// PWMServo servo6;
-// PWMServo servo7;
+PWMServo servo1;  //Create servo objects to control a servo or ESC with PWM
+PWMServo servo2;
+PWMServo servo3;
+PWMServo servo4;
+PWMServo servo5;
+PWMServo servo6;
+PWMServo servo7;
 
 
 
@@ -506,14 +506,14 @@ void controlMixer() {
   //! first guess at how the mixer is going to work, need to change the yaw output somewhere else to make use of bidirectinal, might need to use pwm instead of oneshot125
 
   m1_command_scaled = thro_des + (pitch_PID * cos(motorRads)) + (roll_PID *sin(motorRads));
-  m2_command_scaled = yaw_PID;
+  m2_command_scaled = 0.5 + yaw_PID;
   m3_command_scaled = 0;
   m4_command_scaled = 0;
   m5_command_scaled = 0;
   m6_command_scaled = 0;
 
 
-  //0.5 is centered servo, 0.0 is zero throttle if connecting to ESC for conventional PWM, 1.0 is max throttle
+  //0.5 is centered servo, 0.0 is zero throttle if `connecting to ESC for conventional PWM, 1.0 is max throttle
   s1_command_scaled = 0;
   s2_command_scaled = 0;
   s3_command_scaled = 0;
@@ -526,7 +526,7 @@ void controlMixer() {
 
 void armedStatus() {
   //DESCRIPTION: Check if the throttle cut is off and the throttle input is low to prepare for flight.
-  if ((channel_5_pwm < 1500) && (channel_1_pwm < 1050) && (channel_2_pwm > 1050)) {
+  if ((channel_5_pwm > 1500) && (channel_1_pwm < 1050) && (channel_2_pwm > 1050)) {
     armedFly = true;
     //Serial.println("Armed");
   }
@@ -1508,14 +1508,14 @@ void throttleCut() {
       channel_5_pwm is LOW then throttle cut is OFF and throttle value can change. (ThrottleCut is DEACTIVATED)
       channel_5_pwm is HIGH then throttle cut is ON and throttle value = 120 only. (ThrottleCut is ACTIVATED), (drone is DISARMED)
   */
-  if ((channel_5_pwm > 1500) || (armedFly == false)) {
+  if ((channel_5_pwm < 1500) || (armedFly == false)) {
     armedFly = false;
     m1_command_PWM = 120;
-    m2_command_PWM = 120;
-    m3_command_PWM = 120;
-    m4_command_PWM = 120;
-    m5_command_PWM = 120;
-    m6_command_PWM = 120;
+    m2_command_PWM = 184;
+    // m3_command_PWM = 120;
+    // m4_command_PWM = 120;
+    // m5_command_PWM = 120;
+    // m6_command_PWM = 120;
 
     //Uncomment if using servo PWM variables to control motor ESCs
     //s1_command_PWM = 0;
