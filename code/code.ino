@@ -234,14 +234,14 @@ const int ch6Pin = 22; //aux1 (free aux channel)
 const int PPM_Pin = 23;
 
 //OneShot125 ESC pin outputs:
-const int m1Pin = 0;
+const int m1Pin = 10;
 const int m2Pin = 1;
 const int m3Pin = 2;
 const int m4Pin = 3;
 const int m5Pin = 4;
 const int m6Pin = 5;
 //PWM servo or ESC outputs:
-const int servo1Pin = 6;
+const int servo1Pin = 0;
 const int servo2Pin = 7;
 const int servo3Pin = 8;
 const int servo4Pin = 9;
@@ -424,7 +424,7 @@ void loop() {
   //printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
   //printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
   //printMotorCommands(); //Prints the values being written to the motors (expected: 120 to 250)
-  //printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
+  printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
   //printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
 
   // Get arming status
@@ -503,9 +503,9 @@ void controlMixer() {
   // m5_command_scaled = 0;
   // m6_command_scaled = 0;
 
-  //! first guess at how the mixer is going to work, need to change the yaw output somewhere else to make use of bidirectinal, might need to use pwm instead of oneshot125
+  //! first guess at how the mixer is going to work
 
-  m1_command_scaled = thro_des + (pitch_PID * cos(motorRads)) + (roll_PID *sin(motorRads));
+  m1_command_scaled = 0;  //thro_des + (pitch_passthru * cos(motorRads)) + (roll_passthru *sin(motorRads));
   m2_command_scaled = 0.5 + yaw_PID;
   m3_command_scaled = 0;
   m4_command_scaled = 0;
@@ -514,7 +514,7 @@ void controlMixer() {
 
 
   //0.5 is centered servo, 0.0 is zero throttle if `connecting to ESC for conventional PWM, 1.0 is max throttle
-  s1_command_scaled = 0;
+  s1_command_scaled = thro_des;// + (pitch_passthru * cos(motorRads)) + (roll_passthru *sin(motorRads));;
   s2_command_scaled = 0;
   s3_command_scaled = 0;
   s4_command_scaled = 0;
