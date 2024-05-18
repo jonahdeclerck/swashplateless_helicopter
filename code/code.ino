@@ -455,12 +455,12 @@ void loop() {
   //Command actuators
   commandMotors(); //Sends command pulses to each motor pin using OneShot125 protocol
   servo1.write(s1_command_PWM); //Writes PWM value to servo object
-  servo2.write(s2_command_PWM);
-  servo3.write(s3_command_PWM);
-  servo4.write(s4_command_PWM);
-  servo5.write(s5_command_PWM);
-  servo6.write(s6_command_PWM);
-  servo7.write(s7_command_PWM);
+  // servo2.write(s2_command_PWM);
+  // servo3.write(s3_command_PWM);
+  // servo4.write(s4_command_PWM);
+  // servo5.write(s5_command_PWM);
+  // servo6.write(s6_command_PWM);
+  // servo7.write(s7_command_PWM);
     
   //Get vehicle commands for next loop iteration
   getCommands(); //Pulls current available radio commands
@@ -514,7 +514,8 @@ void controlMixer() {
 
 
   //0.5 is centered servo, 0.0 is zero throttle if `connecting to ESC for conventional PWM, 1.0 is max throttle
-  s1_command_scaled = thro_des;// + (pitch_passthru * cos(motorRads)) + (roll_passthru *sin(motorRads));;
+  //s1_command_scaled = thro_des + abs(pitch_PID*10) + abs(roll_PID*10) + (pitch_PID*10 * cos(motorRads)) + (roll_PID*10 *sin(motorRads));
+  s1_command_scaled = thro_des + (cos(motorRads));
   s2_command_scaled = 0;
   s3_command_scaled = 0;
   s4_command_scaled = 0;
@@ -592,7 +593,8 @@ void IMUinit() {
 void getMotorRads(){
   //DESCRIPTION: Get motor radians for mixer
 
-  motorRads = (as5047p.readAngleDegree())* PI/180;
+  motorRads = (as5047p.readAngleDegree())/360;
+  //(x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 
 }
 
@@ -1510,7 +1512,7 @@ void throttleCut() {
   */
   if ((channel_5_pwm < 1500) || (armedFly == false)) {
     armedFly = false;
-    m1_command_PWM = 120;
+    //m1_command_PWM = 120;
     m2_command_PWM = 184;
     // m3_command_PWM = 120;
     // m4_command_PWM = 120;
@@ -1518,7 +1520,7 @@ void throttleCut() {
     // m6_command_PWM = 120;
 
     //Uncomment if using servo PWM variables to control motor ESCs
-    //s1_command_PWM = 0;
+    s1_command_PWM = 0;
     //s2_command_PWM = 0;
     //s3_command_PWM = 0;
     //s4_command_PWM = 0;
@@ -1629,13 +1631,13 @@ void printDesiredState() {
 }
 
 void printAS5047PData(){
-  if (current_time - print_counter > 10000) {
+  if (current_time - print_counter > 500) {
     print_counter = micros();
     
     Serial.print("Min:");
     Serial.print(0);
     Serial.print(",Max:");
-    Serial.print(PI*2);
+    Serial.print(1);
 
     Serial.print(",MotorRads:");
     Serial.println(motorRads);
@@ -1706,11 +1708,16 @@ void printPIDoutput() {
   if (current_time - print_counter > 10000) {
     print_counter = micros();
 
-    Serial.print(F("roll_PID:"));
+    Serial.print("Min:");
+    Serial.print(-1);
+    Serial.print(",Max:");
+    Serial.print(1);
+
+    Serial.print(F(",roll_PID:"));
     Serial.print(roll_PID);
-    Serial.print(F(" pitch_PID:"));
+    Serial.print(F(",pitch_PID:"));
     Serial.print(pitch_PID);
-    Serial.print(F(" yaw_PID:"));
+    Serial.print(F(",yaw_PID:"));
     Serial.println(yaw_PID);
   }
 }
@@ -1740,23 +1747,28 @@ void printMotorCommands() {
 }
 
 void printServoCommands() {
-  if (current_time - print_counter > 10000) {
+  if (current_time - print_counter > 500) {
     print_counter = micros();
 
-    Serial.print(F("s1_command:"));
-    Serial.print(s1_command_PWM);
-    Serial.print(F(" s2_command:"));
-    Serial.print(s2_command_PWM);
-    Serial.print(F(" s3_command:"));
-    Serial.print(s3_command_PWM);
-    Serial.print(F(" s4_command:"));
-    Serial.print(s4_command_PWM);
-    Serial.print(F(" s5_command:"));
-    Serial.print(s5_command_PWM);
-    Serial.print(F(" s6_command:"));
-    Serial.print(s6_command_PWM);
-    Serial.print(F(" s7_command:"));
-    Serial.println(s7_command_PWM);
+    Serial.print("Min:");
+    Serial.print(0);
+    Serial.print(",Max:");
+    Serial.print(255);
+
+    Serial.print(F(" s1_command:"));
+    Serial.println(s1_command_PWM);
+    // Serial.print(F(" s2_command:"));
+    // Serial.print(s2_command_PWM);
+    // Serial.print(F(" s3_command:"));
+    // Serial.print(s3_command_PWM);
+    // Serial.print(F(" s4_command:"));
+    // Serial.print(s4_command_PWM);
+    // Serial.print(F(" s5_command:"));
+    // Serial.print(s5_command_PWM);
+    // Serial.print(F(" s6_command:"));
+    // Serial.print(s6_command_PWM);
+    // Serial.print(F(" s7_command:"));
+    // Serial.println(s7_command_PWM);
   }
 }
 
