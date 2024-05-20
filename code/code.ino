@@ -2,52 +2,31 @@
 //                                                 USER-SPECIFIED DEFINES                                                 //                                                                 
 //========================================================================================================================//
 
-//Uncomment only one receiver type
-// #define USE_PWM_RX
-//#define USE_PPM_RX
+//RX
 #define USE_SBUS_RX
-//#define USE_DSM_RX
-static const uint8_t num_DSM_channels = 6; //If using DSM RX, change this to match the number of transmitter channels you have
 
-//Uncomment only one IMU
-#define USE_MPU6050_I2C //Default
-//#define USE_MPU9250_SPI
+//IMU
+#define USE_MPU6050_I2C 
 
-//Uncomment only one full scale gyro range (deg/sec)
-#define GYRO_250DPS //Default
-//#define GYRO_500DPS
-//#define GYRO_1000DPS
-//#define GYRO_2000DPS
+//full scale gyro range (deg/sec)
+#define GYRO_250DPS 
 
-//Uncomment only one full scale accelerometer range (G's)
-#define ACCEL_2G //Default
-//#define ACCEL_4G
-//#define ACCEL_8G
-//#define ACCEL_16G
-
+//full scale accelerometer range (G's)
+#define ACCEL_2G 
 
 
 //========================================================================================================================//
 
-
-
-//REQUIRED LIBRARIES (included with download in main sketch folder)
-
+//libraries
 #include <Wire.h>     //I2c communication
 #include <SPI.h>      //SPI communication
 #include <PWMServo.h> //Commanding any extra actuators, installed with teensyduino installer
 #include <AS5047P.h>  //Encoder library
+#include "src/SBUS/SBUS.h"  //SBUS "library"
 
-#if defined USE_SBUS_RX
-  #include "src/SBUS/SBUS.h"
-#endif
+#include "src/MPU6050/MPU6050.h"
+MPU6050 mpu6050;
 
-#if defined USE_MPU6050_I2C
-  #include "src/MPU6050/MPU6050.h"
-  MPU6050 mpu6050;
-#else
-  #error No MPU defined... 
-#endif
 
 //========================================================================================================================//
 
@@ -63,33 +42,25 @@ static const uint8_t num_DSM_channels = 6; //If using DSM RX, change this to mat
 
 AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
 
+
 //========================================================================================================================//
-
-
 
 //Setup gyro and accel full scale value selection and scale factor
 
-#if defined USE_MPU6050_I2C
-  #define GYRO_FS_SEL_250    MPU6050_GYRO_FS_250
-  #define GYRO_FS_SEL_500    MPU6050_GYRO_FS_500
-  #define GYRO_FS_SEL_1000   MPU6050_GYRO_FS_1000
-  #define GYRO_FS_SEL_2000   MPU6050_GYRO_FS_2000
-  #define ACCEL_FS_SEL_2     MPU6050_ACCEL_FS_2
-  #define ACCEL_FS_SEL_4     MPU6050_ACCEL_FS_4
-  #define ACCEL_FS_SEL_8     MPU6050_ACCEL_FS_8
-  #define ACCEL_FS_SEL_16    MPU6050_ACCEL_FS_16
-#endif
-  
-#if defined GYRO_250DPS
-  #define GYRO_SCALE GYRO_FS_SEL_250
-  #define GYRO_SCALE_FACTOR 131.0
-#endif
+#define GYRO_FS_SEL_250    MPU6050_GYRO_FS_250
+#define GYRO_FS_SEL_500    MPU6050_GYRO_FS_500
+#define GYRO_FS_SEL_1000   MPU6050_GYRO_FS_1000
+#define GYRO_FS_SEL_2000   MPU6050_GYRO_FS_2000
+#define ACCEL_FS_SEL_2     MPU6050_ACCEL_FS_2
+#define ACCEL_FS_SEL_4     MPU6050_ACCEL_FS_4
+#define ACCEL_FS_SEL_8     MPU6050_ACCEL_FS_8
+#define ACCEL_FS_SEL_16    MPU6050_ACCEL_FS_16
 
-#if defined ACCEL_2G
-  #define ACCEL_SCALE ACCEL_FS_SEL_2
-  #define ACCEL_SCALE_FACTOR 16384.0
-#endif
+#define GYRO_SCALE GYRO_FS_SEL_250
+#define GYRO_SCALE_FACTOR 131.0
 
+#define ACCEL_SCALE ACCEL_FS_SEL_2
+#define ACCEL_SCALE_FACTOR 16384.0
 
 
 //========================================================================================================================//
@@ -153,12 +124,9 @@ float Ki_yaw = 0.05;          //Yaw I-gain
 float Kd_yaw = 0.00015;       //Yaw D-gain (be careful when increasing too high, motors will begin to overheat!)
 
 
-
 //========================================================================================================================//
 //                                                     DECLARE PINS                                                       //                           
 //========================================================================================================================//                                          
-
-
 
 //Radio:
 const int ch1Pin = 15; //throttle
@@ -179,10 +147,7 @@ const int servo1Pin = 0;
 PWMServo servo1;  //Create servo objects to control a servo or ESC with PWM
 
 
-
 //========================================================================================================================//
-
-
 
 //DECLARE GLOBAL VARIABLES
 
@@ -195,12 +160,10 @@ unsigned long print_counter, serial_counter;
 unsigned long channel_1_pwm, channel_2_pwm, channel_3_pwm, channel_4_pwm, channel_5_pwm, channel_6_pwm;
 unsigned long channel_1_pwm_prev, channel_2_pwm_prev, channel_3_pwm_prev, channel_4_pwm_prev;
 
-#if defined USE_SBUS_RX
-  SBUS sbus(Serial5);
-  uint16_t sbusChannels[16];
-  bool sbusFailSafe;
-  bool sbusLostFrame;
-#endif
+SBUS sbus(Serial5);
+uint16_t sbusChannels[16];
+bool sbusFailSafe;
+bool sbusLostFrame;
 
 //AS5047P encoder
 float motorRads;
@@ -235,6 +198,7 @@ int s1_command_PWM, m2_command_PWM;
 //Flight status
 bool armedFly = false;
 
+
 //========================================================================================================================//
 //                                                      VOID SETUP                                                        //                           
 //========================================================================================================================//
@@ -244,11 +208,8 @@ void setup() {
   delay(500);
   
   //Initialize all pins
-
   pinMode(m2Pin, OUTPUT);
-
-  servo1.attach(servo1Pin, 900, 2100); //Pin, min PWM value, max PWM value
-
+  servo1.attach(servo1Pin, 900, 2100); //Pin, min PWM value, max PWM valu
   delay(5);
 
   //Initialize radio communication
@@ -264,29 +225,20 @@ void setup() {
 
   //Initialize AS5047P encoder
   AS5047Pinit();
+  delay(5);
 
   //Initialize IMU communication
   IMUinit();
-
   delay(5);
-
-  //Get IMU error to zero accelerometer and gyro readings, assuming vehicle is level when powered up
-  //calculate_IMU_error(); //Calibration parameters printed to serial monitor. Paste these in the user specified variables section, then comment this out forever.
 
   //Arm servo channels
   servo1.write(0); //Command servo angle from 0-180 degrees (1000 to 2000 PWM)
-
   delay(5);
-
-  //calibrateESCs(); //PROPS OFF. Uncomment this to calibrate your ESCs by setting throttle stick to max, powering on, and lowering throttle to zero after the beeps
-  //Code will not proceed past here if this function is uncommented!
 
   //Arm OneShot125 motors
   m2_command_PWM = 125; //Command OneShot125 ESC from 125 to 250us pulse length
   armMotors(); //Loop over commandMotors() until ESCs happily arm
-
 }
-
 
 
 //========================================================================================================================//
@@ -326,7 +278,6 @@ void loop() {
   //PID Controller - SELECT ONE:
   controlANGLE(); //Stabilize on angle setpoint
 
-
   //Actuator mixing and scaling to PWM values
   controlMixer(); //Mixes PID outputs to scaled actuator commands -- custom mixing assignments done here
   scaleCommands(); //Scales motor commands to 125 to 250 range (oneshot125 protocol) and servo PWM commands to 0 to 180 (for servo library)
@@ -347,12 +298,9 @@ void loop() {
 }
 
 
-
 //========================================================================================================================//
 //                                                      FUNCTIONS                                                         //                           
 //========================================================================================================================//
-
-
 
 void controlMixer() {
   //DESCRIPTION: Mixes scaled commands from PID controller to actuator outputs based on vehicle configuration
@@ -484,81 +432,9 @@ void getIMUdata() {
   MagZ_prev = MagZ;
 }
 
-void calculate_IMU_error() {
-  //DESCRIPTION: Computes IMU accelerometer and gyro error on startup. Note: vehicle should be powered up on flat surface
-  /*
-   * Don't worry too much about what this is doing. The error values it computes are applied to the raw gyro and 
-   * accelerometer values AccX, AccY, AccZ, GyroX, GyroY, GyroZ in getIMUdata(). This eliminates drift in the
-   * measurement. 
-   */
-  int16_t AcX,AcY,AcZ,GyX,GyY,GyZ,MgX,MgY,MgZ;
-  AccErrorX = 0.0;
-  AccErrorY = 0.0;
-  AccErrorZ = 0.0;
-  GyroErrorX = 0.0;
-  GyroErrorY= 0.0;
-  GyroErrorZ = 0.0;
-  
-  //Read IMU values 12000 times
-  int c = 0;
-  while (c < 12000) {
-    #if defined USE_MPU6050_I2C
-      mpu6050.getMotion6(&AcX, &AcY, &AcZ, &GyX, &GyY, &GyZ);
-    #endif
-    
-    AccX  = AcX / ACCEL_SCALE_FACTOR;
-    AccY  = AcY / ACCEL_SCALE_FACTOR;
-    AccZ  = AcZ / ACCEL_SCALE_FACTOR;
-    GyroX = GyX / GYRO_SCALE_FACTOR;
-    GyroY = GyY / GYRO_SCALE_FACTOR;
-    GyroZ = GyZ / GYRO_SCALE_FACTOR;
-    
-    //Sum all readings
-    AccErrorX  = AccErrorX + AccX;
-    AccErrorY  = AccErrorY + AccY;
-    AccErrorZ  = AccErrorZ + AccZ;
-    GyroErrorX = GyroErrorX + GyroX;
-    GyroErrorY = GyroErrorY + GyroY;
-    GyroErrorZ = GyroErrorZ + GyroZ;
-    c++;
-  }
-  //Divide the sum by 12000 to get the error value
-  AccErrorX  = AccErrorX / c;
-  AccErrorY  = AccErrorY / c;
-  AccErrorZ  = AccErrorZ / c - 1.0;
-  GyroErrorX = GyroErrorX / c;
-  GyroErrorY = GyroErrorY / c;
-  GyroErrorZ = GyroErrorZ / c;
-
-  Serial.print("float AccErrorX = ");
-  Serial.print(AccErrorX);
-  Serial.println(";");
-  Serial.print("float AccErrorY = ");
-  Serial.print(AccErrorY);
-  Serial.println(";");
-  Serial.print("float AccErrorZ = ");
-  Serial.print(AccErrorZ);
-  Serial.println(";");
-  
-  Serial.print("float GyroErrorX = ");
-  Serial.print(GyroErrorX);
-  Serial.println(";");
-  Serial.print("float GyroErrorY = ");
-  Serial.print(GyroErrorY);
-  Serial.println(";");
-  Serial.print("float GyroErrorZ = ");
-  Serial.print(GyroErrorZ);
-  Serial.println(";");
-
-  Serial.println("Paste these values in user specified variables section and comment out calculate_IMU_error() in void setup.");
-}
-
 void Madgwick6DOF(float gx, float gy, float gz, float ax, float ay, float az, float invSampleFreq) {
   //DESCRIPTION: Attitude estimation through sensor fusion - 6DOF
-  /*
-   * See description of Madgwick() for more information. This is a 6DOF implimentation for when magnetometer data is not
-   * available (for example when using the recommended MPU6050 IMU for the default setup).
-   */
+  
   float recipNorm;
   float s0, s1, s2, s3;
   float qDot1, qDot2, qDot3, qDot4;
@@ -569,13 +445,14 @@ void Madgwick6DOF(float gx, float gy, float gz, float ax, float ay, float az, fl
   gy *= 0.0174533f;
   gz *= 0.0174533f;
 
-  //Rate of change of quaternion from gyroscope
+  //Compute the rate of change of the quaternion based on gyroscope data.
   qDot1 = 0.5f * (-q1 * gx - q2 * gy - q3 * gz);
   qDot2 = 0.5f * (q0 * gx + q2 * gz - q3 * gy);
   qDot3 = 0.5f * (q0 * gy - q1 * gz + q3 * gx);
   qDot4 = 0.5f * (q0 * gz + q1 * gy - q2 * gx);
 
   //Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
+  //Ensure accelerometer data is valid and normalize it to a unit vector.
   if(!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f))) {
     //Normalise accelerometer measurement
     recipNorm = invSqrt(ax * ax + ay * ay + az * az);
@@ -584,6 +461,7 @@ void Madgwick6DOF(float gx, float gy, float gz, float ax, float ay, float az, fl
     az *= recipNorm;
 
     //Auxiliary variables to avoid repeated arithmetic
+    //Calculate auxiliary variables to simplify the gradient descent algorithm.
     _2q0 = 2.0f * q0;
     _2q1 = 2.0f * q1;
     _2q2 = 2.0f * q2;
@@ -599,6 +477,7 @@ void Madgwick6DOF(float gx, float gy, float gz, float ax, float ay, float az, fl
     q3q3 = q3 * q3;
 
     //Gradient decent algorithm corrective step
+    //Calculate the corrective step using the gradient descent algorithm.
     s0 = _4q0 * q2q2 + _2q2 * ax + _4q0 * q1q1 - _2q1 * ay;
     s1 = _4q1 * q3q3 - _2q3 * ax + 4.0f * q0q0 * q1 - _2q0 * ay - _4q1 + _8q1 * q1q1 + _8q1 * q2q2 + _4q1 * az;
     s2 = 4.0f * q0q0 * q2 + _2q0 * ax + _4q2 * q3q3 - _2q3 * ay - _4q2 + _8q2 * q1q1 + _8q2 * q2q2 + _4q2 * az;
@@ -609,14 +488,14 @@ void Madgwick6DOF(float gx, float gy, float gz, float ax, float ay, float az, fl
     s2 *= recipNorm;
     s3 *= recipNorm;
 
-    //Apply feedback step
+    //Adjust the quaternion rate of change based on the feedback from the accelerometer.
     qDot1 -= B_madgwick * s0;
     qDot2 -= B_madgwick * s1;
     qDot3 -= B_madgwick * s2;
     qDot4 -= B_madgwick * s3;
   }
 
-  //Integrate rate of change of quaternion to yield quaternion
+  //Integrate rate of change of quaternion to yield quaternion, integration over time
   q0 += qDot1 * invSampleFreq;
   q1 += qDot2 * invSampleFreq;
   q2 += qDot3 * invSampleFreq;
@@ -629,7 +508,7 @@ void Madgwick6DOF(float gx, float gy, float gz, float ax, float ay, float az, fl
   q2 *= recipNorm;
   q3 *= recipNorm;
 
-  //Compute angles
+  //Convert the quaternion to Euler angles (roll, pitch, yaw) for easier interpretation.
   roll_IMU = atan2(q0*q1 + q2*q3, 0.5f - q1*q1 - q2*q2)*57.29577951; //degrees
   pitch_IMU = -asin(constrain(-2.0f * (q1*q3 - q0*q2),-0.999999,0.999999))*57.29577951; //degrees
   yaw_IMU = -atan2(q1*q2 + q0*q3, 0.5f - q2*q2 - q3*q3)*57.29577951; //degrees
@@ -846,43 +725,6 @@ void armMotors() {
   }
 }
 
-void calibrateESCs() {
-  //DESCRIPTION: Used in void setup() to allow standard ESC calibration procedure with the radio to take place.
-  /*  
-   *  Simulates the void loop(), but only for the purpose of providing throttle pass through to the motors, so that you can
-   *  power up with throttle at full, let ESCs begin arming sequence, and lower throttle to zero. This function should only be
-   *  uncommented when performing an ESC calibration.
-   */
-    while (true) {
-      prev_time = current_time;      
-      current_time = micros();      
-      dt = (current_time - prev_time)/1000000.0;
-    
-      getCommands(); //Pulls current available radio commands
-      failSafe(); //Prevent failures in event of bad receiver connection, defaults to failsafe values assigned in setup
-      getDesState(); //Convert raw commands to normalized values based on saturated control limits
-      getIMUdata(); //Pulls raw gyro, accelerometer, and magnetometer data from IMU and LP filters to remove noise
-      Madgwick(GyroX, -GyroY, -GyroZ, -AccX, AccY, AccZ, MagY, -MagX, MagZ, dt); //Updates roll_IMU, pitch_IMU, and yaw_IMU (degrees)
-      getDesState(); //Convert raw commands to normalized values based on saturated control limits
-
-      m2_command_scaled = thro_des;
-
-      s1_command_scaled = thro_des;
-
-      scaleCommands(); //Scales motor commands to 125 to 250 range (oneshot125 protocol) and servo PWM commands to 0 to 180 (for servo library)
-    
-      //throttleCut(); //Directly sets motor commands to low based on state of ch5
-      
-      servo1.write(s1_command_PWM); 
-
-      commandMotors(); //Sends command pulses to each motor pin using OneShot125 protocol
-      
-      //printRadioData(); //Radio pwm values (expected: 1000 to 2000)
-      
-      loopRate(2000); //Do not exceed 2000Hz, all filter parameters tuned to 2000Hz by default
-    }
-}
-
 void throttleCut() {
   //DESCRIPTION: Directly set actuator outputs to minimum value if triggered
   /*
@@ -919,6 +761,7 @@ void loopRate(int freq) {
     checker = micros();
   }
 }
+
 
 //========================================================================================================================//
 //                                                      Debug                                                             //                           
@@ -1008,7 +851,6 @@ void printAccelData() {
   }
 }
 
-
 void printRollPitchYaw() {
   if (current_time - print_counter > 10000) {
     print_counter = micros();
@@ -1064,6 +906,7 @@ void printLoopRate() {
     Serial.println(dt*1000000.0);
   }
 }
+
 
 //========================================================================================================================//
 //                                                  HELPER FUNCTIONS                                                      //                           
