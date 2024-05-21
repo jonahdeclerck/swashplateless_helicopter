@@ -22,9 +22,9 @@
 #include <SPI.h>      //SPI communication
 #include <PWMServo.h> //Commanding any extra actuators, installed with teensyduino installer
 #include <AS5047P.h>  //Encoder library
-#include "src/SBUS/SBUS.h"  //SBUS "library"
 
-#include "src/MPU6050/MPU6050.h"
+#include "src/SBUS/SBUS.h"  //SBUS 
+#include "src/MPU6050/MPU6050.h" //IMU
 MPU6050 mpu6050;
 
 
@@ -250,6 +250,9 @@ void loop() {
   prev_time = current_time;      
   current_time = micros();      
   dt = (current_time - prev_time)/1000000.0;
+
+
+  //-----------------debugging-----------------//
 
   //Print data at 100hz (uncomment one at a time for troubleshooting) - SELECT ONE:
   //printRadioData();     //Prints radio pwm values (expected: 1000 to 2000)

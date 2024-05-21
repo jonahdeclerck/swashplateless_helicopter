@@ -1,11 +1,3 @@
-//Arduino/Teensy Flight Controller - dRehmFlight
-//Author: Nicholas Rehm
-//Project Start: 1/6/2020
-//Last Updated: 7/29/2022
-//Version: Beta 1.3
-
-//========================================================================================================================//
-
 //This file contains all necessary functions and code used for radio communication to avoid cluttering the main code
 
 unsigned long rising_edge_start_1, rising_edge_start_2, rising_edge_start_3, rising_edge_start_4, rising_edge_start_5, rising_edge_start_6; 
