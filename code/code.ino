@@ -414,22 +414,6 @@ void getIMUdata() {
   GyroX_prev = GyroX;
   GyroY_prev = GyroY;
   GyroZ_prev = GyroZ;
-
-  //Magnetometer
-  MagX = MgX/6.0; //uT
-  MagY = MgY/6.0;
-  MagZ = MgZ/6.0;
-  //Correct the outputs with the calculated error values
-  MagX = (MagX - MagErrorX)*MagScaleX;
-  MagY = (MagY - MagErrorY)*MagScaleY;
-  MagZ = (MagZ - MagErrorZ)*MagScaleZ;
-  //LP filter magnetometer data
-  MagX = (1.0 - B_mag)*MagX_prev + B_mag*MagX;
-  MagY = (1.0 - B_mag)*MagY_prev + B_mag*MagY;
-  MagZ = (1.0 - B_mag)*MagZ_prev + B_mag*MagZ;
-  MagX_prev = MagX;
-  MagY_prev = MagY;
-  MagZ_prev = MagZ;
 }
 
 void Madgwick6DOF(float gx, float gy, float gz, float ax, float ay, float az, float invSampleFreq) {
@@ -467,7 +451,6 @@ void Madgwick6DOF(float gx, float gy, float gz, float ax, float ay, float az, fl
     _2q2 = 2.0f * q2;
     _2q3 = 2.0f * q3;
     _4q0 = 4.0f * q0;
-    _4q1 = 4.0f * q1;
     _4q2 = 4.0f * q2;
     _8q1 = 8.0f * q1;
     _8q2 = 8.0f * q2;
