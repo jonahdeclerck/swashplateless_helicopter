@@ -309,9 +309,7 @@ void controlMixer() {
   //DESCRIPTION: Mixes scaled commands from PID controller to actuator outputs based on vehicle configuration
 
   s1_command_scaled = thro_des + abs(pitch_PID) + abs(roll_PID) + (pitch_PID * cos(motorRads)) + (roll_PID *sin(motorRads));
-  // s1_command_scaled = thro_des + (pitch_PID * cos(motorRads)) + (roll_PID *sin(motorRads));
-  // s1_command_scaled = thro_des;
-  m2_command_scaled = 0.5 + yaw_PID;
+  m2_command_scaled = (thro_des/10)+(0.5 + yaw_PID); // centered yaw control, plus a fraction of thro_des to counteract the main rotor rotation
 }
 
 void armedStatus() {
