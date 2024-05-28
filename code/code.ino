@@ -262,7 +262,7 @@ void loop() {
   //printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
   //printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
   //printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
-  //printMotorCommands(); //Prints the values being written to the motors (expected: 120 to 250)
+  printMotorCommands(); //Prints the values being written to the motors (expected: 120 to 250)
   //printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
 
   // Get arming status
@@ -307,22 +307,10 @@ void loop() {
 
 void controlMixer() {
   //DESCRIPTION: Mixes scaled commands from PID controller to actuator outputs based on vehicle configuration
-  /*
-   * Takes roll_PID, pitch_PID, and yaw_PID computed from the PID controller and appropriately mixes them for the desired
-   * vehicle configuration. For example on a quadcopter, the left two motors should have +roll_PID while the right two motors
-   * should have -roll_PID. Front two should have -pitch_PID and the back two should have +pitch_PID etc... every motor has
-   * normalized (0 to 1) thro_des command for throttle control. Can also apply direct unstabilized commands from the transmitter with 
-   * roll_passthru, pitch_passthru, and yaw_passthu. mX_command_scaled and sX_command scaled variables are used in scaleCommands() 
-   * in preparation to be sent to the motor ESCs and servos.
-   * 
-   *Relevant variables:
-   *thro_des - direct thottle control
-   *roll_PID, pitch_PID, yaw_PID - stabilized axis variables1
-   *roll_passthru, pitch_passthru, yaw_passthru - direct unstabilized command passthrough
-   *channel_6_pwm - free auxillary channel, can be used to toggle things with an 'if' statement
-   */
 
-  s1_command_scaled = thro_des + abs(pitch_PID*10) + abs(roll_PID*10) + (pitch_PID*10 * cos(motorRads)) + (roll_PID*10 *sin(motorRads));
+  s1_command_scaled = thro_des + abs(pitch_PID) + abs(roll_PID) + (pitch_PID * cos(motorRads)) + (roll_PID *sin(motorRads));
+  // s1_command_scaled = thro_des + (pitch_PID * cos(motorRads)) + (roll_PID *sin(motorRads));
+  // s1_command_scaled = thro_des;
   m2_command_scaled = 0.5 + yaw_PID;
 }
 
@@ -335,7 +323,6 @@ void armedStatus() {
 
 void AS5047Pinit() {
   //DESCRIPTION: Initialize AS5047P encoder
-  
   while (!as5047p.initSPI())
   {
     Serial.println("AS5047P initialization unsuccessful");
@@ -366,34 +353,33 @@ void IMUinit() {
 }
 
 void getMotorRads() {
-  //DESCRIPTION: Get motor angle for mixer, range 0 to 1
-  motorRads = (as5047p.readAngleDegree())/360;
+    // DESCRIPTION: Get motor angle for mixer, range 0 to 1
+    float angle = as5047p.readAngleDegree(); // Read the angle in degrees
+    if (angle <= 180) {
+        motorRads = angle / 180.0; // Map 0 to 180 degrees to 0 to 1
+    } else {
+        motorRads = (360 - angle) / 180.0; // Map 180 to 360 degrees to 1 to 0
+    }
 }
+
 
 void getIMUdata() {
   //DESCRIPTION: Request full dataset from IMU and LP filter gyro, accelerometer, and magnetometer data
-  /*
-   * Reads accelerometer, gyro, and magnetometer data from IMU as AccX, AccY, AccZ, GyroX, GyroY, GyroZ, MagX, MagY, MagZ. 
-   * These values are scaled according to the IMU datasheet to put them into correct units of g's, deg/sec, and uT. A simple first-order
-   * low-pass filter is used to get rid of high frequency noise in these raw signals. Generally you want to cut
-   * off everything past 80Hz, but if your loop rate is not fast enough, the low pass filter will cause a lag in
-   * the readings. The filter parameters B_gyro and B_accel are set to be good for a 2kHz loop rate. Finally,
-   * the constant errors found in calculate_IMU_error() on startup are subtracted from the accelerometer and gyro readings.
-   */
+
   int16_t AcX,AcY,AcZ,GyX,GyY,GyZ,MgX,MgY,MgZ;
 
-  #if defined USE_MPU6050_I2C
-    mpu6050.getMotion6(&AcX, &AcZ, &AcY, &GyX, &GyZ, &GyY);
-  #endif
+  mpu6050.getMotion6(&AcX, &AcZ, &AcY, &GyX, &GyZ, &GyY);
 
  //Accelerometer
   AccX = AcX / ACCEL_SCALE_FACTOR; //G's
   AccY = -AcY / ACCEL_SCALE_FACTOR; //Invert Y axis to match modified IMU orientation
   AccZ = AcZ / ACCEL_SCALE_FACTOR;
+
   //Correct the outputs with the calculated error values
   AccX = AccX - AccErrorX;
   AccY = AccY - AccErrorY;
   AccZ = AccZ - AccErrorZ;
+
   //LP filter accelerometer data
   AccX = (1.0 - B_accel)*AccX_prev + B_accel*AccX;
   AccY = (1.0 - B_accel)*AccY_prev + B_accel*AccY;
@@ -406,10 +392,12 @@ void getIMUdata() {
   GyroX = GyX / GYRO_SCALE_FACTOR; //deg/sec
   GyroY = -GyY / GYRO_SCALE_FACTOR; //Invert Y axis to match modified IMU orientation
   GyroZ = GyZ / GYRO_SCALE_FACTOR;
+
   //Correct the outputs with the calculated error values
   GyroX = GyroX - GyroErrorX;
   GyroY = GyroY - GyroErrorY;
   GyroZ = GyroZ - GyroErrorZ;
+
   //LP filter gyro data
   GyroX = (1.0 - B_gyro)*GyroX_prev + B_gyro*GyroX;
   GyroY = (1.0 - B_gyro)*GyroY_prev + B_gyro*GyroY;
@@ -502,13 +490,7 @@ void Madgwick6DOF(float gx, float gy, float gz, float ax, float ay, float az, fl
 
 void getDesState() {
   //DESCRIPTION: Normalizes desired control values to appropriate values
-  /*
-   * Updates the desired state variables thro_des, roll_des, pitch_des, and yaw_des. These are computed by using the raw
-   * RC pwm commands and scaling them to be within our limits defined in setup. thro_des stays within 0 to 1 range.
-   * roll_des and pitch_des are scaled to be within max roll/pitch amount in either degrees (angle mode) or degrees/sec
-   * (rate mode). yaw_des is scaled to be within max yaw in degrees/sec. Also creates roll_passthru, pitch_passthru, and
-   * yaw_passthru variables, to be used in commanding motors/servos with direct unstabilized commands in controlMixer().
-   */
+
   thro_des = (channel_1_pwm - 1000.0)/1000.0; //Between 0 and 1
   roll_des = (channel_2_pwm - 1500.0)/500.0; //Between -1 and 1
   pitch_des = (channel_3_pwm - 1500.0)/500.0; //Between -1 and 1
@@ -529,16 +511,6 @@ void getDesState() {
 
 void controlANGLE() {
   //DESCRIPTION: Computes control commands based on state error (angle)
-  /*
-   * Basic PID control to stablize on angle setpoint based on desired states roll_des, pitch_des, and yaw_des computed in 
-   * getDesState(). Error is simply the desired state minus the actual state (ex. roll_des - roll_IMU). Two safety features
-   * are implimented here regarding the I terms. The I terms are saturated within specified limits on startup to prevent 
-   * excessive buildup. This can be seen by holding the vehicle at an angle and seeing the motors ramp up on one side until
-   * they've maxed out throttle...saturating I to a specified limit fixes this. The second feature defaults the I terms to 0
-   * if the throttle is at the minimum setting. This means the motors will not start spooling up on the ground, and the I 
-   * terms will always start from 0 on takeoff. This function updates the variables roll_PID, pitch_PID, and yaw_PID which
-   * can be thought of as 1-D stablized signals. They are mixed to the configuration of the vehicle in controlMixer().
-   */
   
   //Roll
   error_roll = roll_des - roll_IMU;
@@ -581,12 +553,7 @@ void controlANGLE() {
 
 void scaleCommands() {
   //DESCRIPTION: Scale normalized actuator commands to values for ESC/Servo protocol
-  /*
-   * mX_command_scaled variables from the mixer function are scaled to 125-250us for OneShot125 protocol. sX_command_scaled variables from
-   * the mixer function are scaled to 0-180 for the servo library using standard PWM.
-   * mX_command_PWM are updated here which are used to command the motors in commandMotors(). sX_command_PWM are updated 
-   * which are used to command the servos.
-   */
+
   //Scaled to 125us - 250us for oneshot125 protocol
   m2_command_PWM = m2_command_scaled*125 + 125;
 
@@ -602,12 +569,6 @@ void scaleCommands() {
 
 void getCommands() {
   //DESCRIPTION: Get raw PWM values for every channel from the radio
-  /*
-   * Updates radio PWM commands in loop based on current available commands. channel_x_pwm is the raw command used in the rest of 
-   * the loop. If using a PWM or PPM receiver, the radio commands are retrieved from a function in the readPWM file separate from this one which 
-   * is running a bunch of interrupts to continuously update the radio readings. If using an SBUS receiver, the alues are pulled from the SBUS library directly.
-   * The raw radio commands are filtered with a first order low-pass filter to eliminate any really high frequency noise. 
-   */
 
   if (sbus.read(&sbusChannels[0], &sbusFailSafe, &sbusLostFrame))
   {
@@ -636,13 +597,7 @@ void getCommands() {
 
 void failSafe() {
   //DESCRIPTION: If radio gives garbage values, set all commands to default values
-  /*
-   * Radio connection failsafe used to check if the getCommands() function is returning acceptable pwm values. If any of 
-   * the commands are lower than 800 or higher than 2200, then we can be certain that there is an issue with the radio
-   * connection (most likely hardware related). If any of the channels show this failure, then all of the radio commands 
-   * channel_x_pwm are set to default failsafe values specified in the setup. Comment out this function when troubleshooting 
-   * your radio connection in case any extreme values are triggering this function to overwrite the printed variables.
-   */
+
   unsigned minVal = 800;
   unsigned maxVal = 2200;
   int check1 = 0;
@@ -672,23 +627,20 @@ void failSafe() {
 }
 
 void commandMotors() {
-  //DESCRIPTION: Send pulses to motor pins, oneshot125 protocol
-  /*
-   * My crude implimentation of OneShot125 protocol which sends 125 - 250us pulses to the ESCs (mXPin). The pulselengths being
-   * sent are mX_command_PWM, computed in scaleCommands(). This may be replaced by something more efficient in the future.
-   */
+  //DESCRIPTION: Send pulses to motor pin, oneshot125 protocol
+
   int wentLow = 0;
   int pulseStart, timer;
   int flagM2 = 0;
 
   
-  //Write all motor pins high
+  //Write motor pin high
   digitalWrite(m2Pin, HIGH);
 
   pulseStart = micros();
 
-  //Write each motor pin low as correct pulse length is reached
-  while (wentLow < 1 ) { //Keep going until final (6th) pulse is finished, then done
+  //Write motor pin low as correct pulse length is reached
+  while (wentLow < 1 ) { 
     timer = micros();
     if ((m2_command_PWM <= timer - pulseStart) && (flagM2==0)) {
       digitalWrite(m2Pin, LOW);
@@ -700,11 +652,7 @@ void commandMotors() {
 
 void armMotors() {
   //DESCRIPTION: Sends many command pulses to the motors, to be used to arm motors in the void setup()
-  /*  
-   *  Loops over the commandMotors() function 50 times with a delay in between, simulating how the commandMotors()
-   *  function is used in the main loop. Ensures motors arm within the void setup() where there are some delays
-   *  for other processes that sometimes prevent motors from arming.
-   */
+
   for (int i = 0; i <= 50; i++) {
     commandMotors();
     delay(2);
@@ -713,15 +661,7 @@ void armMotors() {
 
 void throttleCut() {
   //DESCRIPTION: Directly set actuator outputs to minimum value if triggered
-  /*
-      Monitors the state of radio command channel_5_pwm and directly sets the mx_command_PWM values to minimum (120 is
-      minimum for oneshot125 protocol, 0 is minimum for standard PWM servo library used) if channel 5 is high. This is the last function
-      called before commandMotors() is called so that the last thing checked is if the user is giving permission to command
-      the motors to anything other than minimum value. Safety first.
 
-      channel_5_pwm is LOW then throttle cut is OFF and throttle value can change. (ThrottleCut is DEACTIVATED)
-      channel_5_pwm is HIGH then throttle cut is ON and throttle value = 120 only. (ThrottleCut is ACTIVATED), (drone is DISARMED)
-  */
   if ((channel_5_pwm < 1500) || (armedFly == false)) {
     armedFly = false;
 
@@ -731,14 +671,8 @@ void throttleCut() {
 }
 
 void loopRate(int freq) {
-  //DESCRIPTION: Regulate main loop rate to specified frequency in Hz
-  /*
-   * It's good to operate at a constant loop rate for filters to remain stable and whatnot. Interrupt routines running in the
-   * background cause the loop rate to fluctuate. This function basically just waits at the end of every loop iteration until 
-   * the correct time has passed since the start of the current loop for the desired loop rate in Hz. 2kHz is a good rate to 
-   * be at because the loop nominally will run between 2.8kHz - 4.2kHz. This lets us have a little room to add extra computations
-   * and remain above 2kHz, without needing to retune all of our filtering parameters.
-   */
+  //DESCRIPTION: Regulate main loop rate to specified frequency in Hz for consistency
+
   float invFreq = 1.0/freq*1000000.0;
   unsigned long checker = micros();
   
@@ -869,11 +803,11 @@ void printPIDoutput() {
 }
 
 void printMotorCommands() {
-  if (current_time - print_counter > 10000) {
+  if (current_time - print_counter > 10) {
     print_counter = micros();
 
     Serial.print("Min:");
-    Serial.print(120);
+    Serial.print(0);
     Serial.print(",Max:");
     Serial.print(250);
 
