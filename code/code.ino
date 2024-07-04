@@ -11,7 +11,7 @@
 //full scale gyro range (deg/sec)
 #define GYRO_250DPS 
 
-//full scale accelerometer range (G's)
+//full scale accelerometer range (G's) 
 #define ACCEL_2G 
 
 
@@ -20,7 +20,7 @@
 //libraries
 #include <Wire.h>     //I2c communication
 #include <SPI.h>      //SPI communication
-#include <PWMServo.h> //Commanding any extra actuators, installed with teensyduino installer
+#include <PWMServo.h> 
 #include <AS5047P.h>  //Encoder library
 
 #include "src/SBUS/SBUS.h"  //SBUS 
@@ -80,14 +80,6 @@ float B_madgwick = 0.04;  //Madgwick filter parameter
 float B_accel = 0.14;     //Accelerometer LP filter paramter, (MPU6050 default: 0.14. MPU9250 default: 0.2)
 float B_gyro = 0.1;       //Gyro LP filter paramter, (MPU6050 default: 0.1. MPU9250 default: 0.17)
 float B_mag = 1.0;        //Magnetometer LP filter parameter
-
-//Magnetometer calibration parameters - if using MPU9250, uncomment calibrateMagnetometer() in void setup() to get these values, else just ignore these
-float MagErrorX = 0.0;
-float MagErrorY = 0.0; 
-float MagErrorZ = 0.0;
-float MagScaleX = 1.0;
-float MagScaleY = 1.0;
-float MagScaleZ = 1.0;
 
 //IMU calibration parameters - calibrate IMU using calculate_IMU_error() in the void setup() to get these values, then comment out calculate_IMU_error()
 float AccErrorX = 0.0;
@@ -258,11 +250,11 @@ void loop() {
   //printRadioData();     //Prints radio pwm values (expected: 1000 to 2000)
   //printDesiredState();  //Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
   //printAS5047PData();   //Prints magnetic encoder data 
-  //printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
+  printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
   //printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
   //printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
   //printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
-  printMotorCommands(); //Prints the values being written to the motors (expected: 120 to 250)
+  //printMotorCommands(); //Prints the values being written to the motors (expected: 120 to 250)
   //printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
 
   // Get arming status
