@@ -1,1 +1,1 @@
-a swashplateless helicopter design based on the video by tom stanton, using Drehmflight 
+a swashplateless helicopter design inspired by [this video by Tom Stanton](https://youtu.be/d80oXSCcHTk?si=MYQpmtHN8eGi8ZL7) 
